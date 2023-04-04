@@ -31,7 +31,7 @@ best_model_student.train()
 #taught_model_student = student_MyDDPM(student_MyUNet(), n_steps=n_steps, device=device)
 def training_loop(ddpm,  n_epochs, optim, device):
   mse = nn.MSELoss()
-  cos = nn.CosineSimilarity(dim=1, eps=1e-6)
+  cos = nn.CosineSimilarity(dim=0, eps=1e-6)
   for epoch in range(n_epochs):
     epoch_loss = 0.0
     x_teacher_list = []
@@ -43,8 +43,11 @@ def training_loop(ddpm,  n_epochs, optim, device):
       time_tensor = (torch.ones(len(x_teacher_list[i]), 1) * t).to(device).long()
       eta_student = ddpm.backward(x, time_tensor).to(device)
       eta_teacher = torch.stack(eta_theta_teacher_list[i], 0).to(device)
-      loss = mse(eta_student, eta_teacher) + cos(eta_student, eta_teacher)
+      eta_student_onedim = eta_student.reshape(-1)
+      eta_teacher_onedim = eta_teacher.reshape(-1)
       optim.zero_grad()
+      loss = mse(eta_student, eta_teacher) + cos(eta_student_onedim, eta_teacher_onedim)
+      #optim.zero_grad()
       loss.backward()
       optim.step()
       epoch_loss += loss.item() / len(x_teacher_list)
