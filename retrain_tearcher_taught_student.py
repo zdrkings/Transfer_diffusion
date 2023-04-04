@@ -10,7 +10,7 @@ from show_images import show_images
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 n_steps = 1000
-lr = 0.01
+lr = 0.005
 store_path = 'ddpm_mnist_student.pt'
 '''
 x_teacher_list = []
@@ -22,15 +22,16 @@ test2 = torch.stack(x_teacher_list[998], 0)#用于表示不同时刻的图片(�
 print(test1[0].shape)
 print(test2.shape)
 print(len(x_teacher_list[1]))
-
+'''
 
 best_model_student = student_MyDDPM(student_MyUNet(), n_steps=n_steps, device=device)
 best_model_student.load_state_dict(torch.load(store_path, map_location=device))
 best_model_student.train()
-'''
-taught_model_student = student_MyDDPM(student_MyUNet(), n_steps=n_steps, device=device)
+
+#taught_model_student = student_MyDDPM(student_MyUNet(), n_steps=n_steps, device=device)
 def training_loop(ddpm,  n_epochs, optim, device):
   mse = nn.MSELoss()
+  cos = nn.CosineSimilarity(dim=1, eps=1e-6)
   for epoch in range(n_epochs):
     epoch_loss = 0.0
     x_teacher_list = []
@@ -42,7 +43,7 @@ def training_loop(ddpm,  n_epochs, optim, device):
       time_tensor = (torch.ones(len(x_teacher_list[i]), 1) * t).to(device).long()
       eta_student = ddpm.backward(x, time_tensor).to(device)
       eta_teacher = torch.stack(eta_theta_teacher_list[i], 0).to(device)
-      loss = mse(eta_student, eta_teacher)
+      loss = mse(eta_student, eta_teacher) + cos(eta_student, eta_teacher)
       optim.zero_grad()
       loss.backward()
       optim.step()
@@ -54,9 +55,9 @@ def training_loop(ddpm,  n_epochs, optim, device):
 
 
 
-optimizer = Adam(taught_model_student.parameters(), lr=lr, weight_decay=0.01)
+optimizer = Adam(best_model_student.parameters(), lr=lr, weight_decay=0.01)
 scheduler_1 = StepLR(optimizer, step_size=3, gamma=0.75)
-training_loop(ddpm=taught_model_student, n_epochs=20, optim=optimizer, device=device)
+training_loop(ddpm=best_model_student, n_epochs=20, optim=optimizer, device=device)
 
 #如何保存一个好一点的模型，然后生成图片
 
